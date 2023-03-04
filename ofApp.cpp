@@ -3,7 +3,7 @@
 //--------------------------------------------------------------
 void ofApp::setup(){
 	ofSetFrameRate(60);
-	setBgColor();
+	//setBgColor();
 	
 	image_settings.accurate;
 	
@@ -14,6 +14,11 @@ void ofApp::setup(){
 	gui_hierarchy.setup();
 	gui_hierarchy.setName("Scene Hierarchy");
 	gui_hierarchy.minimize();
+
+	//Layers
+	gui_layers.setup();
+	gui_layers.setName("Layers");
+	gui_layers.minimize();
 
 	//File Menu
 	gui_file_menu.setup();
@@ -30,10 +35,30 @@ void ofApp::setup(){
 	gui_image_menu.setName("Image");
 	gui_image_menu.minimize();
 
+	//Light menu
+	gui_light_menu.setup();
+	gui_light_menu.setName("Light");
+	gui_light_menu.minimize();
+	gui_light_menu.add(sun_menu_color_amb.setup("Ambient Color", ofVec3f(sun_color_amb.r, sun_color_amb.g, sun_color_amb.b), ofVec3f(0, 0, 0), ofVec3f(255, 255, 255)));
+	gui_light_menu.add(sun_menu_color_diff.setup("Diffuse Color", ofVec3f(sun_color_diff.r, sun_color_diff.g, sun_color_diff.b), ofVec3f(0, 0, 0), ofVec3f(255, 255, 255)));
+	gui_light_menu.add(sun_intensity.setup("Intensity", 0.3f, 0, 1));
+
+	sun_menu_color_amb.getFloatSlider("x").addListener(this, &ofApp::SunColor_AmbRValueChanged);
+	sun_menu_color_amb.getFloatSlider("y").addListener(this, &ofApp::SunColor_AmbGValueChanged);
+	sun_menu_color_amb.getFloatSlider("z").addListener(this, &ofApp::SunColor_AmbBValueChanged);
+
+	sun_menu_color_diff.getFloatSlider("x").addListener(this, &ofApp::SunColor_DiffRValueChanged);
+	sun_menu_color_diff.getFloatSlider("y").addListener(this, &ofApp::SunColor_DiffGValueChanged);
+	sun_menu_color_diff.getFloatSlider("z").addListener(this, &ofApp::SunColor_DiffBValueChanged);
+
+	sun_intensity.addListener(this, &ofApp::SunIntensityValueChanged);
+
+	//light_menu_color.addListener(this, &ofApp::SunColorValueChanged);
+
 	//Camera menu	
 	gui_camera_menu.setup();
 	gui_camera_menu.setName("Camera");
-	gui_camera_menu.add(cam_menu_pos.setup("Position", ofVec3f(0, 0, 0), ofVec3f(-500, -500, -5000), ofVec3f(500, 500, 5000)));
+	gui_camera_menu.add(cam_menu_pos.setup("Position", ofVec3f(0, 0, -50), ofVec3f(-500, -500, -5000), ofVec3f(500, 500, 5000)));
 	gui_camera_menu.add(cam_menu_rot.setup("Rotation", ofVec3f(0, 0, 0), ofVec3f(-360, -360, -360), ofVec3f(360, 360, 360)));
 	gui_camera_menu.add(cam_menu_fov.setup("Fielf of View", 60.0f, 0.1f, 179.9f));
 	gui_camera_menu.add(cam_menu_clip_near.setup("Near Clip", 50.0f, 0.1f, 500.0f));
@@ -51,7 +76,6 @@ void ofApp::setup(){
 	cam_menu_fov.addListener(this, &ofApp::camFovSliderChanged);
 	cam_menu_clip_near.addListener(this, &ofApp::camClipNearSliderChanged);
 	cam_menu_clip_far.addListener(this, &ofApp::camClipFarSliderChanged);
-	//cam_menu_pos.addListener(this, &ofApp::FloatSliderValueChanged);
 	gui_camera_menu.minimize();
 
 	//Send menu elements in a list
@@ -59,10 +83,7 @@ void ofApp::setup(){
 	gui_menu_list.push_back(&gui_3D_menu);
 	gui_menu_list.push_back(&gui_image_menu);
 	gui_menu_list.push_back(&gui_camera_menu);
-
-
-	///0.00012f
-	//
+	gui_menu_list.push_back(&gui_light_menu);
 
 	//Set GUI to position
 	resetGUI();
@@ -70,39 +91,43 @@ void ofApp::setup(){
 	//Load default demonstration model
 	character_model.loadModel("perso3D.obj", true);
 	character_model.setPosition(0, 0, 0);	
-	character_model.disableMaterials();
+	//character_model.disableMaterials();
 
 	//Load background models
 	float center_x = ofGetWidth() / 2.0f;
 	float center_y = ofGetHeight() / 2.0f;
 	
-	for (size_t i = 0; i < 50; i++)
-	{
-		ofxAssimpModelLoader model;
-		model.loadModel("perso3D.obj", true);
-		model.setRotation(1, 180, 1, 0, 0);
-		model.setPosition(ofRandom(ofGetWidth()), ofRandom(ofGetHeight()) , -500);
-		model.disableMaterials();
-
-		bg_models.push_back(model);
-	}
-
 	//Set default shader
 	shader_default.load("lambert_330_vs.glsl", "lambert_330_fs.glsl");
 
 	//Load default camera
 	cam_target = { 0.0f, 0.0f, 0.0f };
 	cam_clip_n = 50.0f;
-	cam_clip_f = 2000.f;
+	cam_clip_f = 1000.f;
 	cam_fov = 60.0f;
 
-	//cam_default->setFov(cam_fov);
-	//cam_default->setFarClip(cam_clip_f);
-	//cam_default->setNearClip(cam_clip_n);
+	cam_default->setFov(cam_fov);
+	cam_default->setFarClip(cam_clip_f);
+	cam_default->setNearClip(cam_clip_n);
 	cam_default->setGlobalPosition(glm::vec3(0, 0, -50));
-	cam_default->setupPerspective(false, cam_fov, cam_clip_n, cam_clip_f, glm::vec2(0, 0));
+	cam_default->setupPerspective(true, cam_fov, cam_clip_n, cam_clip_f, glm::vec2(0, 0));
 
 	std::cout << cam_default->getUpDir() << " is cam up vec" << endl;
+
+	//Sun Light
+	sun->setDirectional();
+	
+	//Set first layer
+	layer_2D bg;
+	bg.index = 0;
+	bg.name = "Background";
+	gui_image_menu.add(layer_new.setup("New layer", 20, 20));
+	gui_image_menu.add(layer_del.setup("Delete Selected layers",20, 20));
+	layer_new.addListener(this, &ofApp::CreateNewLayer);
+	layer_del.addListener(this, &ofApp::DeleteSelectedLayers);
+
+
+
 
 	/*/These are tests/examples
 	// Add the listener function to the slider
@@ -135,28 +160,36 @@ void ofApp::update(){
 	float center_x = ofGetWidth()  / 2.0f;
 	float center_y = ofGetHeight() / 2.0f;
 
-	// transformation du modele
-	character_model.setScale(1, 1, 1);
-	character_model.setPosition(center_x, center_y + 150, 0);
+	/* transformation du modele
+	//character_model.setScale(1, 1, 1);
+	//character_model.setPosition(center_x, center_y + 150, 0);
 
-	if (true)
-		character_model.setRotation(0, ofGetFrameNum() * 0.3f, 0.0f, 0.0f, 1.0f);
+	if (true) { 
+		character_model.setRotation(0, 0.0f, ofGetFrameNum() * 0.3f, 0.0f, 1.0f); 
+	}
+	*/
+
+
+	if (mouse_left_held) {
+		ofSetColor(255, 0, 255, 255);
+		//ofLine(mouse_click_pos.x, mouse_click_pos.y, (float)ofGetMouseX(), (float)ofGetMouseY());
+	}
+
+
+
 
 	// configuration de la lumière
-	sun.setPointLight();
-	sun.setDiffuseColor(255);
-	sun.setGlobalPosition(center_x, center_y, 255.0f);
+	sun->setup();
+	sun->setPointLight();
+	sun->setDiffuseColor(sun_color_diff);
+	sun->setAmbientColor(sun_color_amb);	
+	sun->setGlobalPosition(center_x, center_y, 255.0f);
 
 	// passer les attributs uniformes du shader
 	shader_default.begin();
-	shader_default.setUniform3f("color_ambient", 0.1f, 0.1f, 0.1f);
-	shader_default.setUniform3f("color_diffuse", 0.1f, 0.1f, 0.1f);
-	shader_default.setUniform3f("light_position", sun.getGlobalPosition());
-
-	//Camera
-	cam_default->setFov(cam_default->getFov() + (ofGetFrameNum() * cam_zoom_speed));
-	glm::vec3 p = cam_default->getPosition();
-	cam_default->setPosition(glm::vec3(p.x, p.y, p.z - ofGetFrameNum() * -cam_dolly_speed));
+	shader_default.setUniform3f("color_ambient", (float)sun_color_amb.r/255, (float)sun_color_amb.g / 255, (float)sun_color_amb.b / 255);
+	shader_default.setUniform3f("color_diffuse", sun_color_diff.r* sun_intensity_value / 255, sun_color_diff.g* sun_intensity_value / 255, sun_color_diff.b* sun_intensity_value / 255);
+	shader_default.setUniform3f("light_position", sun->getGlobalPosition());
 }
 
 //--------------------------------------------------------------
@@ -171,36 +204,26 @@ void ofApp::draw(){
 		}
 	}
 
+
 	cam_default->begin();
-
-
-
-
 
 	// activer l'occlusion en profondeur
 	ofEnableDepthTest();
 
 	// activer l'éclairage dynamique
 	ofEnableLighting();
-
-	
-
-
+		
 	if (meshes_list.size() > 0) {
 		for (int i = 0; i < meshes_list.size(); i++) {
 			meshes_list[i].draw();
 		}
 	}
-	
 
-	
-
-	// activer la lumière
-	sun.enable();
+	// activer la lumière	
+	sun->enable();
 
 	// activer le shader
 	shader_default.begin();
-
 
 	//Background characters
 	if (bg_models.size() > 0) {
@@ -209,18 +232,21 @@ void ofApp::draw(){
 		}
 	}
 
-
 	// dessiner l'objet
 	character_model.draw(OF_MESH_FILL);
-
-
-
+	
 	// désactiver le shader
 	shader_default.end();
-
 	
+	//Dessiner le 2D
+	if (mouse_left_held) {
+		ofSetColor(255, 0, 255, 255);
+		ofDrawLine(mouse_click_pos.x, mouse_click_pos.y, (float)ofGetMouseX(), (float)ofGetMouseY());
+	}
+
+
 	// désactiver la lumière
-	sun.disable();
+	sun->disable();
 
 	// désactiver l'éclairage dynamique
 	ofDisableLighting();
@@ -229,6 +255,7 @@ void ofApp::draw(){
 	ofDisableDepthTest();
 
 	cam_default->end();
+
 	// dessiner l'interface graphique
 	resetGUI();
 
@@ -279,22 +306,86 @@ void ofApp::keyReleased(int key){
 
 //--------------------------------------------------------------
 void ofApp::mouseMoved(int x, int y ){
-	mouse_delta = ofVec2f(ofGetMouseX() - ofGetPreviousMouseX(), ofGetMouseY() - ofGetPreviousMouseY());
+	
+	/*
+
+	*/
 	//std::cout << "mouse delta: " << mouse_delta << ", to position " << x << ", " << y << endl;
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseDragged(int x, int y, int button){
 	std::cout << "mouse drag button "<< button << "at " << x << ", " << y << endl;
+
+	if (mouse_wheel_held) {
+		mouse_delta = ofVec2f(ofGetMouseX() - ofGetPreviousMouseX(), ofGetMouseY() - ofGetPreviousMouseY());
+		float _x = cam_default->getGlobalPosition().x + mouse_delta.x;
+		float _y = cam_default->getGlobalPosition().y + mouse_delta.y;
+		float _z = cam_default->getGlobalPosition().z;
+
+		cam_default->setGlobalPosition(_x, _y, _z);     //move(mouse_delta.x, mouse_delta.y, 0);
+	}
 }
 
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button){
-	std::cout << "mouse click with button "<< button << "at " << x << ", " << y << endl;
+	//Mouse wheel
+	if (button == 1 && !mouse_any_held) {
+		if (!mouse_wheel_held) {
+			mouse_click_pos = ofVec2f(ofGetMouseX() - cam_default->getGlobalPosition().x, ofGetMouseY() - cam_default->getGlobalPosition().y);
+		}
+
+		mouse_wheel_held = true;
+		mouse_any_held = true;
+		std::cout << "mouse click pos " << mouse_click_pos.x << ", " << mouse_click_pos.y << endl;
+		return;
+	}
+
+	//Left button
+	if (button == 0 && !mouse_any_held) {
+		if (!mouse_left_held) {
+			mouse_click_pos = ofVec2f(ofGetMouseX() - cam_default->getGlobalPosition().x, ofGetMouseY() - cam_default->getGlobalPosition().y);
+		}
+		mouse_left_held = true;
+		mouse_any_held = true;
+		std::cout << "mouse click pos " << mouse_click_pos.x << ", " << mouse_click_pos.y << endl;
+		return;
+	}
+
+	//Right button
+	if (button == 2 && !mouse_any_held) {
+		if (!mouse_right_held) {
+			mouse_click_pos = ofVec2f(ofGetMouseX() + cam_default->getGlobalPosition().x, ofGetMouseY() + cam_default->getGlobalPosition().y);
+		}
+		mouse_right_held = true;
+		mouse_any_held = true;
+		std::cout << "mouse click pos " << mouse_click_pos.x << ", " << mouse_click_pos.y << endl;
+		return;
+	}
+
+
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button){
+	//Mouse wheel
+
+	if (button == 1) {
+		mouse_wheel_held = false;
+	} 
+
+	//Left button
+	if (button == 0) {
+		mouse_left_held = false;
+	}
+
+	//Right button
+	if (button == 2) {
+		mouse_right_held = false;
+	}
+
+	mouse_any_held = mouse_wheel_held || mouse_left_held || mouse_right_held;
+
 	std::cout << "mouse release with button "<< button << "at " << x << ", " << y << endl;
 }
 
@@ -305,17 +396,14 @@ void ofApp::mouseEntered(int x, int y){
 
 //--------------------------------------------------------------
 void ofApp::mouseScrolled(int x, int y, float scrollX, float scrollY){	
-	if (scrollY == 1) {
-		//Mouse Wheel scroll up
-		std::cout << "mouse scrolled up" << endl;
-		return;
-	}
+	
+	int _scrollDir = scrollY > 0 ? 1 : -1;
+	std::cout << _scrollDir << endl;
 
-	if (scrollY == -1) {
-		//Mouse Wheel scroll down
-		std::cout << "mouse scrolled down" << endl;
-		return;
-	}
+	//glm::vec3 p = cam_default->getPosition();
+	cam_default->dolly(scrollY* zoom_scroll_speed);
+
+	//cam_default->setPosition(glm::vec3(p.x, p.y, _scrollDir/100));
 }
 
 //--------------------------------------------------------------
@@ -454,8 +542,15 @@ void ofApp::resetGUI() {
 		_w += m->getWidth();		
 	}
 
-		//Draw the scene hierarchy Gui (floating)
+		//Stick hierarchy panel on top-right corner of screen
+		gui_hierarchy.setPosition(ofGetWidth() - gui_hierarchy.getWidth(), 0);
+
+		//Draw the scene hierarchy Gui
 		gui_hierarchy.draw();
+
+		//Draw the Layers Gui below scene hierarchy
+		gui_layers.setPosition(ofGetWidth() - gui_layers.getWidth(), gui_hierarchy.getHeight());
+		gui_layers.draw();
 }
 
 //--------------------------------------------------------------
@@ -552,4 +647,188 @@ void ofApp::camSetDolly(float& value) {
 void ofApp::camSetZoom(float& value) {
 	cam_zoom_speed = value;
 	//cam_default->lookAt(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+}
+
+//--------------------------------------------------------------
+void ofApp::SunColor_AmbRValueChanged(float& value)
+{
+	//Get normalized value
+	float _r = value / 255;
+	cout << "Slider value changed: " << value << " representing " << _r * 100 << "%" << endl;
+
+	sun_color_amb.r = value;
+	sun_menu_color_amb.getFloatSlider("x").setFillColor(ofColor(value, 0, 0, 255));
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::SunColor_AmbGValueChanged(float& value)
+{
+	//Get normalized value
+	float _g = value / 255;
+	cout << "Slider value changed: " << value << " representing " << _g * 100 << "%" << endl;
+
+	sun_color_amb.g = value;
+	sun_menu_color_amb.getFloatSlider("y").setFillColor(ofColor(0, value, 0, 255));
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::SunColor_AmbBValueChanged(float& value)
+{
+	//Get normalized value
+	float _b = value / 255;	
+	cout << "Slider value changed: " << value << " representing " << _b * 100 << "%" << endl;	
+	sun_color_amb.b = value;
+	sun_menu_color_amb.getFloatSlider("z").setFillColor(ofColor(0, 0, value, 255));
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::SunColor_DiffRValueChanged(float& value)
+{
+	//Get normalized value
+	float _r = value / 255;
+	cout << "Slider value changed: " << value << " representing " << _r * 100 << "%" << endl;
+
+	sun_color_diff.r = value;
+	sun_menu_color_diff.getFloatSlider("x").setFillColor(ofColor(value, 0, 0, 255));
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::SunColor_DiffGValueChanged(float& value)
+{
+	//Get normalized value
+	float _g = value / 255;
+	cout << "Slider value changed: " << value << " representing " << _g * 100 << "%" << endl;
+
+	sun_color_diff.g = value;
+	sun_menu_color_diff.getFloatSlider("y").setFillColor(ofColor(0, value, 0, 255));
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::SunColor_DiffBValueChanged(float& value)
+{
+	//Get normalized value
+	float _b = value / 255;
+	cout << "Slider value changed: " << value << " representing " << _b * 100 << "%" << endl;
+	sun_color_diff.b = value;
+	sun_menu_color_diff.getFloatSlider("z").setFillColor(ofColor(0, 0, value, 255));
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::SunIntensityValueChanged(float& value)
+{	
+	sun_intensity_value = value;
+	sun_intensity.setFillColor(ofColor(value*255, value * 255, value * 255, 255));	
+	cout << "Sun constant attenuation is: " << sun->getAttenuationConstant() << ". Sun Linear attenuation is: " << sun->getAttenuationLinear() << endl;
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::CreateNewLayer()
+{
+	cout << "button New layer is: clicked"  << endl;
+
+	//Make a struct for hierarchy panel
+	layer_2D* l = new layer_2D();
+	std::stringstream ss;
+
+	
+
+	std::string sService = ss.str();
+	l->index = layers_list.size();
+	ss << "Layer_" << layers_list.size();
+	l->name = ss.str();
+
+	//Make a new toggle button and add it to the hierarchy
+	ofxToggle* t = new ofxToggle();
+	gui_layers.add(t->setup(l->name, false));
+
+	//Add a listener to the new toggle
+	t->addListener(this, &ofApp::UpdateLayersSelection);
+
+	//Make added element selected by default
+	layers_list.push_back(*l);
+	std::cout << l->name << " has been created " << endl;
+
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::DeleteSelectedLayers()
+{
+
+	//Reference to toggle
+	ofxToggle* toggle = nullptr;
+
+	//Loop through hierarchy
+	for (int i = 0; i < gui_layers.getNumControls(); i++) {
+		//Reference to toggle boxe
+		ofxBaseGui* control = gui_layers.getControl(i);
+		toggle = dynamic_cast<ofxToggle*>(control);
+
+		//If the toggle box remove from layers list
+		if (toggle->value) {
+			
+
+			auto it = std::find_if(layers_list.begin(), layers_list.end(),
+				[&](const layer_2D& s) { return s.name == toggle->getName(); });
+
+			if (it != layers_list.end()) {
+				layers_list.erase(it);
+			}
+		}		
+	}
+
+	//Resize layer list
+	layers_list.shrink_to_fit();
+
+	//Reset gui_layer panel
+	gui_layers.clear();
+	for (size_t i = 0; i < layers_list.size(); i++)
+	{
+		//Make a new layer toggle and add it to the gui panel
+		ofxToggle* t = new ofxToggle();
+		gui_layers.add(t->setup(layers_list[i].name, false));
+
+		//Add a listener to the new toggle
+		t->addListener(this, &ofApp::UpdateLayersSelection);
+	}
+
+	//Update app
+	update();
+}
+
+//--------------------------------------------------------------
+void ofApp::UpdateLayersSelection(bool& checked) {
+	//Reference to toggle
+	ofxToggle* toggle = nullptr;
+
+	//Clear selection list
+	selected_layers_list.clear();
+
+	//Loop through layers list
+	for (int i = 0; i < layers_list.size(); i++) {
+		
+		//Reference to toggle boxe
+		ofxBaseGui* control = gui_layers.getControl(i);
+		toggle = dynamic_cast<ofxToggle*>(control);
+
+		//If the toggle box is checked, make sure it's in the selection list
+		if (toggle && toggle->value) {
+			
+			selected_layers_list.push_back(&layers_list[i]);
+			std::cout << toggle->getName() << " was FOUND in Layer selection : " << std::endl;
+
+		}
+
+		//Resize selection vector
+		selected_layers_list.shrink_to_fit();
+	}
+
+	//std::cout << "selected layer contains: " << endl;
 }
